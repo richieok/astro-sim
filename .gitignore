@@ -1,0 +1,12 @@
+# Claude local settings
+.claude/settings.local.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Simulation output
+viewer/simulation_data.json
