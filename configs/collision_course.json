@@ -1,0 +1,23 @@
+{
+  "dt": 60,
+  "total_time": 8640000,
+  "every": 1,
+  "bodies": [
+    {
+      "name": "Body A",
+      "mass": 1.0e27,
+      "radius_km": 50000,
+      "color": "#FF6B6B",
+      "position": [0.0, 0.0, 0.0],
+      "velocity": [0.0, 0.0, 0.0]
+    },
+    {
+      "name": "Body B",
+      "mass": 1.0e26,
+      "radius_km": 50000,
+      "color": "#6BFF6B",
+      "position": [2e8, 1.9e9, 0.0],
+      "velocity": [-5000.0, 0.0, 0.0]
+    }
+  ]
+}

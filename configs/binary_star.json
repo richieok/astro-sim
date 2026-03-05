@@ -1,0 +1,31 @@
+{
+  "dt": 3600,
+  "total_time": 31536000,
+  "every": 24,
+  "bodies": [
+    {
+      "name": "Star Alpha",
+      "mass": 2.0e30,
+      "radius_km": 800000,
+      "color": "#FFA500",
+      "position": [-1.5e11, 0.0, 0.0],
+      "velocity": [0.0, -15000.0, 0.0]
+    },
+    {
+      "name": "Star Beta",
+      "mass": 1.5e30,
+      "radius_km": 650000,
+      "color": "#ADD8E6",
+      "position": [2.0e11, 0.0, 0.0],
+      "velocity": [0.0, 20000.0, 0.0]
+    },
+    {
+      "name": "Planet",
+      "mass": 6.0e24,
+      "radius_km": 6500,
+      "color": "#90EE90",
+      "position": [0.0, 5.0e11, 0.0],
+      "velocity": [-25000.0, 0.0, 500.0]
+    }
+  ]
+}

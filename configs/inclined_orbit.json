@@ -1,0 +1,23 @@
+{
+  "dt": 3600,
+  "total_time": 25920000,
+  "every": 1,
+  "bodies": [
+    {
+      "name": "Earth",
+      "mass": 5.972e24,
+      "radius_km": 6371,
+      "color": "#4B9CD3",
+      "position": [0.0, 0.0, 0.0],
+      "velocity": [0.0, 0.0, 0.0]
+    },
+    {
+      "name": "Moon",
+      "mass": 7.342e22,
+      "radius_km": 1737,
+      "color": "#C8C8C8",
+      "position": [3.844e8, 0.0, 0.0],
+      "velocity": [0.0, 1022.0, 500.0]
+    }
+  ]
+}

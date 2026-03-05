@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tail:*)",
+      "Bash(python:*)",
+      "Bash(sleep 2:*)",
+      "Bash(curl:*)",
+      "Bash(open:*)",
+      "Bash(kill 37367:*)"
+    ]
+  }
+}

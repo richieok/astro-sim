@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Astro-Sim — Orbital Mechanics Simulator</title>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a12; color: #e0e0f0; font-family: 'Segoe UI', system-ui, sans-serif; overflow: hidden; }
+
+  /* ── SETUP SCREEN ── */
+  #setup-screen {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    background: #0a0a12;
+    overflow-y: auto;
+    z-index: 100;
+  }
+  #setup-screen header {
+    padding: 24px 32px 12px;
+    border-bottom: 1px solid #1e1e3a;
+    display: flex; align-items: baseline; gap: 16px;
+  }
+  #setup-screen header h1 { font-size: 1.6rem; color: #a0c4ff; letter-spacing: 1px; }
+  #setup-screen header span { font-size: 0.85rem; color: #556; }
+
+  .setup-body { display: flex; gap: 0; flex: 1; min-height: 0; }
+
+  /* Left: presets + params */
+  .setup-left {
+    width: 260px; min-width: 200px;
+    padding: 20px;
+    border-right: 1px solid #1e1e3a;
+    display: flex; flex-direction: column; gap: 16px;
+    overflow-y: auto;
+  }
+  .setup-left h3 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: #778; }
+  .preset-btn {
+    width: 100%; padding: 8px 12px;
+    background: #12122a; border: 1px solid #2a2a5a;
+    color: #a0c4ff; border-radius: 6px; cursor: pointer;
+    text-align: left; font-size: 0.88rem; transition: background 0.15s, border-color 0.15s;
+  }
+  .preset-btn:hover { background: #1a1a40; }
+  .preset-btn.selected {
+    background: #1a3a6a;
+    border-color: #4a7adf;
+    color: #c8deff;
+    box-shadow: inset 0 0 0 1px #4a7adf;
+  }
+
+  .param-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .param-field { display: flex; flex-direction: column; gap: 4px; }
+  .param-field label { font-size: 0.75rem; color: #778; }
+  .param-field input {
+    padding: 5px 8px; background: #12122a; border: 1px solid #2a2a5a;
+    color: #e0e0f0; border-radius: 4px; font-size: 0.82rem; width: 100%;
+  }
+
+  /* Right: body list */
+  .setup-right { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+  .setup-right-header { display: flex; justify-content: space-between; align-items: center; }
+  .setup-right-header h3 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: #778; }
+
+  .add-body-btn {
+    padding: 6px 14px; background: #1a3a6a; border: 1px solid #2a5aaa;
+    color: #a0c4ff; border-radius: 6px; cursor: pointer; font-size: 0.82rem;
+    transition: background 0.15s;
+  }
+  .add-body-btn:hover { background: #1e4880; }
+
+  .body-card {
+    background: #10101e; border: 1px solid #1e1e3a; border-radius: 8px; padding: 14px;
+  }
+  .body-card-header {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
+  }
+  .body-card-header input.name-input {
+    background: transparent; border: none; border-bottom: 1px solid #2a2a5a;
+    color: #c0d8ff; font-size: 0.95rem; font-weight: 600; padding: 2px 4px; width: 160px;
+  }
+  .remove-btn {
+    background: none; border: none; color: #664; cursor: pointer; font-size: 1.1rem;
+    padding: 0 4px; transition: color 0.15s;
+  }
+  .remove-btn:hover { color: #c44; }
+
+  .body-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+  }
+  .body-field { display: flex; flex-direction: column; gap: 3px; }
+  .body-field label { font-size: 0.7rem; color: #556; text-transform: uppercase; letter-spacing: 0.5px; }
+  .body-field input[type="text"],
+  .body-field input[type="number"] {
+    padding: 4px 7px; background: #0c0c1e; border: 1px solid #222244;
+    color: #d0d8f0; border-radius: 4px; font-size: 0.82rem; width: 100%;
+  }
+  .body-field input[type="color"] {
+    padding: 2px; background: #0c0c1e; border: 1px solid #222244;
+    border-radius: 4px; width: 100%; height: 28px; cursor: pointer;
+  }
+  .body-field.wide { grid-column: span 3; }
+  .vec3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; }
+  .vec3 input {
+    padding: 4px 6px; background: #0c0c1e; border: 1px solid #222244;
+    color: #d0d8f0; border-radius: 4px; font-size: 0.78rem;
+  }
+
+  .run-row { padding: 16px 20px; border-top: 1px solid #1e1e3a; display: flex; gap: 12px; align-items: center; }
+  .run-btn {
+    padding: 10px 28px; background: #1a5a3a; border: 1px solid #2a8a5a;
+    color: #80ffb0; border-radius: 8px; cursor: pointer; font-size: 0.95rem; font-weight: 600;
+    transition: background 0.15s;
+  }
+  .run-btn:hover { background: #1e6e46; }
+  .error-msg { color: #f88; font-size: 0.85rem; }
+
+  /* ── PROGRESS OVERLAY ── */
+  #progress-overlay {
+    position: absolute; inset: 0;
+    background: rgba(10,10,18,0.92);
+    display: none; flex-direction: column;
+    align-items: center; justify-content: center; gap: 20px;
+    z-index: 200;
+  }
+  #progress-overlay.active { display: flex; }
+  .spinner {
+    width: 48px; height: 48px;
+    border: 4px solid #1e1e3a;
+    border-top-color: #a0c4ff;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #progress-overlay p { color: #a0c4ff; font-size: 1rem; }
+
+  /* ── VIEWER ── */
+  #viewer-screen {
+    position: absolute; inset: 0;
+    display: none;
+  }
+  #viewer-screen.active { display: block; }
+  #canvas-container { width: 100%; height: 100%; }
+
+  /* Controls toggle button */
+  #controls-toggle {
+    position: absolute; bottom: 20px; right: 20px;
+    padding: 9px 18px;
+    background: rgba(255,255,255,0.95);
+    border: 1px solid #d0d0d8;
+    color: #1a1a2e;
+    border-radius: 24px;
+    cursor: pointer; font-size: 0.85rem; font-weight: 600;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.35);
+    z-index: 20;
+    transition: background 0.15s, box-shadow 0.15s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  #controls-toggle:hover { background: #fff; box-shadow: 0 4px 18px rgba(0,0,0,0.45); }
+
+  /* Controls popover */
+  #controls {
+    position: absolute; bottom: 68px; right: 20px;
+    background: #ffffff;
+    border: 1px solid #d8d8e8;
+    border-radius: 14px;
+    padding: 18px 20px;
+    display: none; flex-direction: column; gap: 14px;
+    z-index: 19;
+    min-width: 260px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.28);
+  }
+  #controls.open { display: flex; }
+
+  .ctrl-btn {
+    padding: 5px 14px; background: #f0f0f8; border: 1px solid #c8c8de;
+    color: #1a1a2e; border-radius: 5px; cursor: pointer; font-size: 0.82rem;
+    transition: background 0.12s;
+  }
+  .ctrl-btn:hover { background: #e4e4f4; }
+  .ctrl-btn.active { background: #dce8ff; border-color: #7aa0e0; color: #1a3060; }
+
+  .ctrl-label { font-size: 0.72rem; color: #666; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+  .ctrl-group { display: flex; align-items: center; gap: 8px; }
+  input[type=range] { width: 90px; accent-color: #3a6adf; }
+
+  .controls-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .controls-divider { border: none; border-top: 1px solid #e8e8f0; margin: 2px 0; }
+
+  #frame-counter { font-size: 0.8rem; color: #555; }
+  #back-btn {
+    position: absolute; bottom: 20px; left: 20px;
+    padding: 9px 18px;
+    background: rgba(255,255,255,0.95); border: 1px solid #d0d0d8;
+    color: #b02020; border-radius: 24px; cursor: pointer; font-size: 0.85rem; font-weight: 600;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.35);
+    z-index: 20;
+    transition: background 0.15s, box-shadow 0.15s;
+  }
+  #back-btn:hover { background: #fff; box-shadow: 0 4px 18px rgba(0,0,0,0.45); }
+
+  /* Body legend */
+  #legend {
+    position: absolute; top: 12px; right: 12px;
+    background: rgba(10,10,20,0.82);
+    border: 1px solid #1e1e3a; border-radius: 8px;
+    padding: 10px 14px;
+    z-index: 10;
+    min-width: 140px;
+  }
+  #legend h4 { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: #556; margin-bottom: 8px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: #b0b8d0; margin-bottom: 4px; cursor: pointer; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+  /* Collision banner */
+  #collision-banner {
+    position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+    background: rgba(180,30,30,0.9);
+    border: 1px solid #ff6060;
+    color: #fff;
+    padding: 8px 24px; border-radius: 8px;
+    font-size: 0.95rem; font-weight: 600;
+    display: none;
+    z-index: 20;
+    white-space: nowrap;
+  }
+
+  /* Tooltip */
+  #tooltip {
+    position: absolute; pointer-events: none;
+    background: rgba(10,10,30,0.9); border: 1px solid #2a2a5a;
+    color: #c0d0f0; padding: 6px 10px; border-radius: 5px;
+    font-size: 0.78rem; display: none; z-index: 30;
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════ SETUP SCREEN ═══════════════════════════ -->
+<div id="setup-screen">
+  <header>
+    <h1>⬡ Astro-Sim</h1>
+    <span>3D N-body Orbital Mechanics Simulator</span>
+  </header>
+
+  <div class="setup-body">
+    <!-- Left panel -->
+    <div class="setup-left">
+      <div>
+        <h3>Presets</h3>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px;">
+          <button class="preset-btn" data-preset="solar_system">☀ Solar System (5 bodies)</button>
+          <button class="preset-btn" data-preset="binary_star">✦ Binary Star + Planet</button>
+          <button class="preset-btn" data-preset="collision_course">💥 Collision Course</button>
+          <button class="preset-btn" data-preset="inclined_orbit">↗ Inclined Orbit (Moon)</button>
+        </div>
+      </div>
+
+      <div>
+        <h3>Simulation Params</h3>
+        <div class="param-grid" style="margin-top:8px;">
+          <div class="param-field">
+            <label>Timestep (s)</label>
+            <input type="number" id="param-dt" value="3600" min="1">
+          </div>
+          <div class="param-field">
+            <label>Total time (s)</label>
+            <input type="number" id="param-total" value="31536000" min="1">
+          </div>
+          <div class="param-field" style="grid-column:span 2;">
+            <label>Record every N steps</label>
+            <input type="number" id="param-every" value="1" min="1">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right panel: body list -->
+    <div class="setup-right">
+      <div class="setup-right-header">
+        <h3>Celestial Bodies</h3>
+        <button class="add-body-btn" id="add-body-btn">+ Add Body</button>
+      </div>
+      <div id="body-list"></div>
+    </div>
+  </div>
+
+  <div class="run-row">
+    <button class="run-btn" id="run-btn">▶ Run Simulation</button>
+    <span class="error-msg" id="run-error"></span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ PROGRESS OVERLAY ═══════════════════════ -->
+<div id="progress-overlay">
+  <div class="spinner"></div>
+  <p id="progress-msg">Running simulation…</p>
+</div>
+
+<!-- ═══════════════════════════ VIEWER SCREEN ══════════════════════════ -->
+<div id="viewer-screen">
+  <div id="canvas-container"></div>
+
+  <div id="collision-banner"></div>
+
+  <div id="legend">
+    <h4>Bodies</h4>
+    <div id="legend-items"></div>
+  </div>
+
+  <div id="tooltip"></div>
+
+  <button id="controls-toggle">✕ Hide Controls</button>
+
+  <div id="controls" class="open">
+    <div class="controls-row">
+      <button class="ctrl-btn" id="play-btn">⏸ Pause</button>
+      <button class="ctrl-btn" id="reset-btn">↺ Reset</button>
+      <button class="ctrl-btn" id="trail-btn">Trails: ON</button>
+      <button class="ctrl-btn" id="lock-btn">Lock: OFF</button>
+      <button class="ctrl-btn" id="point-btn">● Points</button>
+    </div>
+
+    <hr class="controls-divider">
+
+    <div class="ctrl-group">
+      <span class="ctrl-label">Speed</span>
+      <input type="range" id="speed-slider" min="1" max="200" value="20">
+      <span id="speed-val" style="font-size:0.78rem;color:#444;min-width:28px;">20×</span>
+    </div>
+
+    <div class="ctrl-group">
+      <span class="ctrl-label">Dist scale</span>
+      <input type="range" id="dist-slider" min="-3" max="3" step="0.1" value="0">
+      <span id="dist-val" style="font-size:0.78rem;color:#444;min-width:36px;">1.0×</span>
+    </div>
+
+    <div class="ctrl-group">
+      <span class="ctrl-label">Body size</span>
+      <input type="range" id="size-slider" min="0.1" max="10" step="0.1" value="1">
+      <span id="size-val" style="font-size:0.78rem;color:#444;min-width:28px;">1×</span>
+    </div>
+
+    <hr class="controls-divider">
+
+    <div class="controls-row">
+      <span id="frame-counter">Frame 0 / 0</span>
+    </div>
+  </div>
+
+  <button id="back-btn">← New Sim</button>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ═══════════════════════════════════════════════════════════════
+// PRESET CONFIGS (loaded from /presets)
+// ═══════════════════════════════════════════════════════════════
+const PRESETS = await fetch('/presets').then(r => r.json());
+
+// ═══════════════════════════════════════════════════════════════
+// BODY CARD BUILDER
+// ═══════════════════════════════════════════════════════════════
+let bodyCount = 0;
+
+function createBodyCard(data = {}) {
+  const id = bodyCount++;
+  const d = {
+    name: data.name || `Body ${id+1}`,
+    mass: data.mass ?? 1e24,
+    radius_km: data.radius_km ?? 6000,
+    color: data.color || '#4B9CD3',
+    position: data.position || [0, 0, 0],
+    velocity: data.velocity || [0, 0, 0],
+  };
+
+  const card = document.createElement('div');
+  card.className = 'body-card';
+  card.dataset.id = id;
+  card.innerHTML = `
+    <div class="body-card-header">
+      <input class="name-input" type="text" value="${d.name}" placeholder="Body name">
+      <button class="remove-btn" title="Remove">✕</button>
+    </div>
+    <div class="body-grid">
+      <div class="body-field">
+        <label>Mass (kg)</label>
+        <input type="text" class="f-mass" value="${d.mass}">
+      </div>
+      <div class="body-field">
+        <label>Radius (km)</label>
+        <input type="number" class="f-radius" value="${d.radius_km}">
+      </div>
+      <div class="body-field">
+        <label>Color</label>
+        <input type="color" class="f-color" value="${d.color}">
+      </div>
+      <div class="body-field wide">
+        <label>Position [x, y, z] (m)</label>
+        <div class="vec3">
+          <input type="text" class="f-px" placeholder="x" value="${d.position[0]}">
+          <input type="text" class="f-py" placeholder="y" value="${d.position[1]}">
+          <input type="text" class="f-pz" placeholder="z" value="${d.position[2]}">
+        </div>
+      </div>
+      <div class="body-field wide">
+        <label>Velocity [vx, vy, vz] (m/s)</label>
+        <div class="vec3">
+          <input type="text" class="f-vx" placeholder="vx" value="${d.velocity[0]}">
+          <input type="text" class="f-vy" placeholder="vy" value="${d.velocity[1]}">
+          <input type="text" class="f-vz" placeholder="vz" value="${d.velocity[2]}">
+        </div>
+      </div>
+    </div>
+  `;
+
+  card.querySelector('.remove-btn').addEventListener('click', () => card.remove());
+  return card;
+}
+
+function loadPreset(key) {
+  const p = PRESETS[key];
+  if (!p) return;
+  document.getElementById('param-dt').value = p.dt;
+  document.getElementById('param-total').value = p.total_time;
+  document.getElementById('param-every').value = p.every;
+  const list = document.getElementById('body-list');
+  list.innerHTML = '';
+  bodyCount = 0;
+  p.bodies.forEach(b => list.appendChild(createBodyCard(b)));
+}
+
+function readBodies() {
+  const cards = document.querySelectorAll('.body-card');
+  return Array.from(cards).map(card => ({
+    name: card.querySelector('.name-input').value.trim() || 'Body',
+    mass: parseFloat(card.querySelector('.f-mass').value),
+    radius_km: parseFloat(card.querySelector('.f-radius').value),
+    color: card.querySelector('.f-color').value,
+    position: [
+      parseFloat(card.querySelector('.f-px').value) || 0,
+      parseFloat(card.querySelector('.f-py').value) || 0,
+      parseFloat(card.querySelector('.f-pz').value) || 0,
+    ],
+    velocity: [
+      parseFloat(card.querySelector('.f-vx').value) || 0,
+      parseFloat(card.querySelector('.f-vy').value) || 0,
+      parseFloat(card.querySelector('.f-vz').value) || 0,
+    ],
+  }));
+}
+
+// Init setup with solar preset
+loadPreset('solar_system');
+
+document.getElementById('add-body-btn').addEventListener('click', () => {
+  document.getElementById('body-list').appendChild(createBodyCard());
+});
+
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    loadPreset(btn.dataset.preset);
+  });
+});
+
+// Mark the initially loaded preset as selected
+document.querySelector('.preset-btn[data-preset="solar_system"]').classList.add('selected');
+
+// ═══════════════════════════════════════════════════════════════
+// RUN SIMULATION
+// ═══════════════════════════════════════════════════════════════
+document.getElementById('run-btn').addEventListener('click', async () => {
+  const errEl = document.getElementById('run-error');
+  errEl.textContent = '';
+
+  const bodies = readBodies();
+  if (bodies.length < 2) { errEl.textContent = 'Add at least 2 bodies.'; return; }
+  if (bodies.some(b => isNaN(b.mass) || b.mass <= 0)) { errEl.textContent = 'All bodies need a positive mass.'; return; }
+
+  const cfg = {
+    dt: parseFloat(document.getElementById('param-dt').value),
+    total_time: parseFloat(document.getElementById('param-total').value),
+    every: parseInt(document.getElementById('param-every').value),
+    bodies,
+  };
+
+  const overlay = document.getElementById('progress-overlay');
+  const msg = document.getElementById('progress-msg');
+  overlay.classList.add('active');
+  msg.textContent = 'Running simulation…';
+
+  try {
+    const resp = await fetch('/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cfg),
+    });
+    if (!resp.ok) {
+      const err = await resp.json();
+      throw new Error(err.error || resp.statusText);
+    }
+    const result = await resp.json();
+    msg.textContent = `Loading ${result.num_frames} frames…`;
+
+    const dataResp = await fetch('/simulation_data.json?t=' + Date.now());
+    const simData = await dataResp.json();
+
+    overlay.classList.remove('active');
+    startViewer(simData);
+  } catch (e) {
+    overlay.classList.remove('active');
+    errEl.textContent = 'Error: ' + e.message;
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// THREE.JS VIEWER
+// ═══════════════════════════════════════════════════════════════
+let renderer, scene, camera, controls;
+let axesScene, axesCamera;
+let animFrameId = null;
+let simData = null;
+let meshes = [], trailLines = [], trailPositions = [], pointMeshes = [];
+let frameIndex = 0;
+let playing = true;
+let speed = 20;
+let distScale = 1.0;
+let sizeScale = 1.0;
+let trailsOn = true;
+let lockedBody = -1;
+let pointMode = false;
+let lastFrameTime = 0;
+const BASE_SCALE = 1e-9; // metres → scene units (1 AU ≈ 150 units)
+const MAX_TRAIL = 500;
+const AXES_SIZE = 120; // pixel size of the axes inset gizmo
+
+function scenePos(raw, ds) {
+  return [raw[0] * BASE_SCALE * ds, raw[1] * BASE_SCALE * ds, raw[2] * BASE_SCALE * ds];
+}
+
+function bodySceneRadius(radius_km, ds, ss) {
+  // Visible radius: sqrt-compress so small planets are still visible
+  const logR = Math.log10(Math.max(radius_km, 1));
+  return logR * 0.4 * ss;
+}
+
+function fitCamera(data) {
+  const frames = data.frames;
+  if (!frames || frames.length === 0) return;
+
+  // Sample up to 30 evenly-spaced frames to capture full orbital extent
+  const sampleCount = Math.min(30, frames.length);
+  let minX = Infinity, maxX = -Infinity;
+  let minY = Infinity, maxY = -Infinity;
+  let minZ = Infinity, maxZ = -Infinity;
+
+  for (let s = 0; s < sampleCount; s++) {
+    const fi = Math.floor(s / sampleCount * frames.length);
+    frames[fi].forEach(rawPos => {
+      const [sx, sy, sz] = scenePos(rawPos, distScale);
+      if (sx < minX) minX = sx; if (sx > maxX) maxX = sx;
+      if (sy < minY) minY = sy; if (sy > maxY) maxY = sy;
+      if (sz < minZ) minZ = sz; if (sz > maxZ) maxZ = sz;
+    });
+  }
+
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  const cz = (minZ + maxZ) / 2;
+
+  // Half-diagonal of bounding box, with a floor so we don't zoom in infinitely
+  const dx = maxX - minX, dy = maxY - minY, dz = maxZ - minZ;
+  const radius = Math.max(Math.sqrt(dx * dx + dy * dy + dz * dz) / 2, 0.5);
+
+  // Distance needed so the bounding sphere fills ~70% of the view
+  const fovRad = camera.fov * Math.PI / 180;
+  const dist = (radius / Math.tan(fovRad / 2)) * 1.4;
+
+  controls.target.set(cx, cy, cz);
+  camera.position.set(cx, cy + radius * 0.4, cz + dist);
+  camera.lookAt(cx, cy, cz);
+  controls.update();
+}
+
+function startViewer(data) {
+  simData = data;
+  frameIndex = 0;
+  playing = true;
+
+  // Show viewer, hide setup
+  document.getElementById('setup-screen').style.display = 'none';
+  const vs = document.getElementById('viewer-screen');
+  vs.classList.add('active');
+
+  // (Re)init Three.js
+  if (renderer) {
+    renderer.dispose();
+    document.getElementById('canvas-container').innerHTML = '';
+  }
+
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x050510);
+
+  // Starfield
+  const starGeo = new THREE.BufferGeometry();
+  const starVerts = [];
+  for (let i = 0; i < 8000; i++) {
+    starVerts.push((Math.random()-0.5)*4000, (Math.random()-0.5)*4000, (Math.random()-0.5)*4000);
+  }
+  starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starVerts, 3));
+  scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.4 })));
+
+  // Ambient + point light
+  scene.add(new THREE.AmbientLight(0x334466, 0.6));
+  const ptLight = new THREE.PointLight(0xffffff, 2, 0, 1.5);
+  scene.add(ptLight);
+
+  const container = document.getElementById('canvas-container');
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setSize(container.clientWidth, container.clientHeight);
+  renderer.autoClear = false;
+  container.appendChild(renderer.domElement);
+
+  camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.01, 100000);
+
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+
+  fitCamera(data);
+
+  // Bodies
+  meshes = [];
+  trailLines = [];
+  trailPositions = [];
+  pointMeshes = [];
+  pointMode = true;
+  document.getElementById('point-btn').textContent = '○ Spheres';
+  document.getElementById('point-btn').classList.add('active');
+
+  data.bodies.forEach((b, i) => {
+    const r = bodySceneRadius(b.radius_km, distScale, sizeScale);
+    const geo = new THREE.SphereGeometry(r, 24, 16);
+    const mat = new THREE.MeshPhongMaterial({ color: new THREE.Color(b.color), emissive: new THREE.Color(b.color), emissiveIntensity: 0.3 });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.visible = false;
+    scene.add(mesh);
+    meshes.push(mesh);
+
+    // Trail
+    const trailGeo = new THREE.BufferGeometry();
+    const pos = new Float32Array(MAX_TRAIL * 3);
+    trailGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    trailGeo.setDrawRange(0, 0);
+    const trailMat = new THREE.LineBasicMaterial({ color: new THREE.Color(b.color), opacity: 0.45, transparent: true });
+    const line = new THREE.Line(trailGeo, trailMat);
+    scene.add(line);
+    trailLines.push(line);
+    trailPositions.push([]);
+
+    // Point representation (fixed pixel size, no distance scaling)
+    const ptGeo = new THREE.BufferGeometry();
+    ptGeo.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0], 3));
+    const ptMat = new THREE.PointsMaterial({
+      color: new THREE.Color(b.color),
+      size: 5,
+      sizeAttenuation: false,
+    });
+    const pt = new THREE.Points(ptGeo, ptMat);
+    pt.visible = true;
+    scene.add(pt);
+    pointMeshes.push(pt);
+  });
+
+  initAxesHelper();
+  buildLegend(data.bodies);
+  setupCollisionBanner(data.meta.collision_event);
+
+  // Controls wiring
+  document.getElementById('play-btn').textContent = '⏸ Pause';
+  playing = true;
+  document.getElementById('frame-counter').textContent = `Frame 0 / ${data.meta.num_frames}`;
+
+  // Window resize
+  window.onresize = () => {
+    const w = container.clientWidth, h = container.clientHeight;
+    renderer.setSize(w, h);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  };
+
+  // Ray cast for body click (camera lock)
+  const raycaster = new THREE.Raycaster();
+  const mouse = new THREE.Vector2();
+  renderer.domElement.addEventListener('click', e => {
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+    const hits = raycaster.intersectObjects(meshes);
+    if (hits.length > 0) {
+      const idx = meshes.indexOf(hits[0].object);
+      lockedBody = (lockedBody === idx) ? -1 : idx;
+      document.getElementById('lock-btn').textContent = lockedBody >= 0
+        ? `Lock: ${data.bodies[lockedBody].name}` : 'Lock: OFF';
+      document.getElementById('lock-btn').classList.toggle('active', lockedBody >= 0);
+    }
+  });
+
+  // Tooltip on hover
+  const tooltip = document.getElementById('tooltip');
+  renderer.domElement.addEventListener('mousemove', e => {
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+    const hits = raycaster.intersectObjects(meshes);
+    if (hits.length > 0) {
+      const idx = meshes.indexOf(hits[0].object);
+      const b = data.bodies[idx];
+      tooltip.style.display = 'block';
+      tooltip.style.left = (e.clientX + 12) + 'px';
+      tooltip.style.top = (e.clientY - 8) + 'px';
+      tooltip.textContent = `${b.name} — ${b.mass.toExponential(2)} kg`;
+    } else {
+      tooltip.style.display = 'none';
+    }
+  });
+
+  if (animFrameId) cancelAnimationFrame(animFrameId);
+  animate(0);
+}
+
+function initAxesHelper() {
+  axesScene = new THREE.Scene();
+
+  // Colored axis lines: X=red, Y=green, Z=blue
+  axesScene.add(new THREE.AxesHelper(1));
+
+  // Letter labels at each axis tip
+  const labelDefs = [
+    { text: 'X', pos: [1.35, 0,    0   ], color: '#ff5555' },
+    { text: 'Y', pos: [0,    1.35, 0   ], color: '#55ee55' },
+    { text: 'Z', pos: [0,    0,    1.35], color: '#5599ff' },
+  ];
+  labelDefs.forEach(({ text, pos, color }) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 64; canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = color;
+    ctx.font = 'bold 44px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, 32, 32);
+    const tex = new THREE.CanvasTexture(canvas);
+    const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false });
+    const sprite = new THREE.Sprite(mat);
+    sprite.position.set(...pos);
+    sprite.scale.set(0.38, 0.38, 0.38);
+    axesScene.add(sprite);
+  });
+
+  axesCamera = new THREE.OrthographicCamera(-1.8, 1.8, 1.8, -1.8, 0.1, 10);
+  axesCamera.position.set(0, 0, 5);
+}
+
+function buildLegend(bodies) {
+  const el = document.getElementById('legend-items');
+  el.innerHTML = '';
+  bodies.forEach((b, i) => {
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    item.innerHTML = `<div class="legend-dot" style="background:${b.color}"></div><span>${b.name}</span>`;
+    item.addEventListener('click', () => {
+      lockedBody = (lockedBody === i) ? -1 : i;
+      document.getElementById('lock-btn').textContent = lockedBody >= 0
+        ? `Lock: ${bodies[lockedBody].name}` : 'Lock: OFF';
+      document.getElementById('lock-btn').classList.toggle('active', lockedBody >= 0);
+    });
+    el.appendChild(item);
+  });
+}
+
+function setupCollisionBanner(event) {
+  const banner = document.getElementById('collision-banner');
+  banner.style.display = 'none';
+  if (!event) return;
+  banner.textContent = `💥 Collision: ${event.names[0]} + ${event.names[1]}`;
+}
+
+function updateTrail(bodyIdx, x, y, z) {
+  const history = trailPositions[bodyIdx];
+  history.push(x, y, z);
+  if (history.length > MAX_TRAIL * 3) history.splice(0, 3);
+
+  const line = trailLines[bodyIdx];
+  const buf = line.geometry.attributes.position.array;
+  const count = history.length / 3;
+  for (let i = 0; i < history.length; i++) buf[i] = history[i];
+  line.geometry.attributes.position.needsUpdate = true;
+  line.geometry.setDrawRange(0, count);
+  line.visible = trailsOn;
+}
+
+function animate(timestamp) {
+  animFrameId = requestAnimationFrame(animate);
+  controls.update();
+
+  if (playing && simData) {
+    const elapsed = timestamp - lastFrameTime;
+    const msPerFrame = 1000 / 60;
+    if (elapsed >= msPerFrame / speed * 60 / speed) {
+      lastFrameTime = timestamp;
+      advanceFrames(Math.max(1, Math.floor(speed / 10)));
+    }
+  }
+
+  // Main scene — full viewport
+  const container = document.getElementById('canvas-container');
+  const W = container.clientWidth, H = container.clientHeight;
+  renderer.setViewport(0, 0, W, H);
+  renderer.setScissorTest(false);
+  renderer.clear();
+  renderer.render(scene, camera);
+
+  // Axes gizmo — bottom-left inset
+  if (axesScene && axesCamera) {
+    const S = AXES_SIZE;
+    renderer.setViewport(10, 10, S, S);
+    renderer.setScissor(10, 10, S, S);
+    renderer.setScissorTest(true);
+    renderer.clearDepth();
+    // Sync orientation then reposition so the camera always aims at the origin
+    axesCamera.quaternion.copy(camera.quaternion);
+    const _axDir = new THREE.Vector3();
+    camera.getWorldDirection(_axDir);
+    axesCamera.position.copy(_axDir).negate().multiplyScalar(3);
+    renderer.render(axesScene, axesCamera);
+    renderer.setScissorTest(false);
+  }
+}
+
+function advanceFrames(n) {
+  if (!simData) return;
+  const frames = simData.frames;
+  const total = frames.length;
+  if (frameIndex >= total) { playing = false; document.getElementById('play-btn').textContent = '▶ Play'; return; }
+
+  for (let s = 0; s < n && frameIndex < total; s++, frameIndex++) {
+    const frame = frames[frameIndex];
+    frame.forEach((rawPos, i) => {
+      const [sx, sy, sz] = scenePos(rawPos, distScale);
+      meshes[i].position.set(sx, sy, sz);
+      if (pointMeshes[i]) pointMeshes[i].position.set(sx, sy, sz);
+      updateTrail(i, sx, sy, sz);
+    });
+
+    // Show collision banner at collision frame
+    const ce = simData.meta.collision_event;
+    if (ce && frameIndex >= ce.frame) {
+      document.getElementById('collision-banner').style.display = 'block';
+    }
+  }
+
+  // Camera lock
+  if (lockedBody >= 0 && meshes[lockedBody]) {
+    const target = meshes[lockedBody].position;
+    controls.target.lerp(target, 0.08);
+  }
+
+  document.getElementById('frame-counter').textContent = `Frame ${frameIndex} / ${total}`;
+}
+
+function resetPlayback() {
+  frameIndex = 0;
+  playing = true;
+  document.getElementById('play-btn').textContent = '⏸ Pause';
+  document.getElementById('collision-banner').style.display = 'none';
+  trailPositions.forEach(arr => arr.length = 0);
+  trailLines.forEach(line => {
+    line.geometry.setDrawRange(0, 0);
+    line.geometry.attributes.position.needsUpdate = true;
+  });
+}
+
+// ── Controls ──
+document.getElementById('play-btn').addEventListener('click', () => {
+  playing = !playing;
+  document.getElementById('play-btn').textContent = playing ? '⏸ Pause' : '▶ Play';
+  if (playing && frameIndex >= (simData?.frames?.length ?? 0)) resetPlayback();
+});
+
+document.getElementById('reset-btn').addEventListener('click', resetPlayback);
+
+document.getElementById('speed-slider').addEventListener('input', e => {
+  speed = parseInt(e.target.value);
+  document.getElementById('speed-val').textContent = speed + '×';
+});
+
+document.getElementById('dist-slider').addEventListener('input', e => {
+  distScale = Math.pow(10, parseFloat(e.target.value));
+  document.getElementById('dist-val').textContent = distScale.toFixed(2) + '×';
+  // Rebuild scene positions immediately from current frame
+  if (simData && frameIndex > 0) {
+    const frame = simData.frames[Math.min(frameIndex, simData.frames.length - 1)];
+    frame.forEach((rawPos, i) => {
+      const [sx, sy, sz] = scenePos(rawPos, distScale);
+      meshes[i].position.set(sx, sy, sz);
+      if (pointMeshes[i]) pointMeshes[i].position.set(sx, sy, sz);
+    });
+  }
+});
+
+document.getElementById('size-slider').addEventListener('input', e => {
+  sizeScale = parseFloat(e.target.value);
+  document.getElementById('size-val').textContent = sizeScale.toFixed(1) + '×';
+  if (!simData) return;
+  simData.bodies.forEach((b, i) => {
+    const r = bodySceneRadius(b.radius_km, distScale, sizeScale);
+    meshes[i].geometry.dispose();
+    meshes[i].geometry = new THREE.SphereGeometry(r, 24, 16);
+  });
+});
+
+document.getElementById('trail-btn').addEventListener('click', () => {
+  trailsOn = !trailsOn;
+  document.getElementById('trail-btn').textContent = `Trails: ${trailsOn ? 'ON' : 'OFF'}`;
+  trailLines.forEach(l => l.visible = trailsOn);
+});
+
+document.getElementById('lock-btn').addEventListener('click', () => {
+  lockedBody = -1;
+  document.getElementById('lock-btn').textContent = 'Lock: OFF';
+  document.getElementById('lock-btn').classList.remove('active');
+});
+
+document.getElementById('point-btn').addEventListener('click', () => {
+  pointMode = !pointMode;
+  meshes.forEach((m, i) => {
+    m.visible = !pointMode;
+    if (pointMeshes[i]) pointMeshes[i].visible = pointMode;
+  });
+  document.getElementById('point-btn').textContent = pointMode ? '○ Spheres' : '● Points';
+  document.getElementById('point-btn').classList.toggle('active', pointMode);
+});
+
+document.getElementById('back-btn').addEventListener('click', () => {
+  if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
+  document.getElementById('viewer-screen').classList.remove('active');
+  document.getElementById('setup-screen').style.display = 'flex';
+});
+
+// Controls panel toggle
+const controlsPanel = document.getElementById('controls');
+const controlsToggle = document.getElementById('controls-toggle');
+controlsToggle.addEventListener('click', () => {
+  controlsPanel.classList.toggle('open');
+  controlsToggle.textContent = controlsPanel.classList.contains('open') ? '✕ Hide Controls' : '⚙ Controls';
+});
+</script>
+</body>
+</html>
